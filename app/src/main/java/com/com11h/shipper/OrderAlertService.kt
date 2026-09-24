@@ -75,12 +75,12 @@ class OrderAlertService : Service() {
                 try {
                     val api = Api(BuildConfig.API_BASE_URL, kcn, token)
                     val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-                    val j = api.call("shipper_orders")
+                    val j = api.call("shipper_available_orders")
                     val all = j.optJSONArray("orders") ?: org.json.JSONArray()
                     val arr = org.json.JSONArray()
                     for (i in 0 until all.length()) {
                         val o = all.optJSONObject(i)
-                        if (o?.optString("status") == "SHOP_CONFIRMED") arr.put(o)
+                        if (o != null) arr.put(o)
                     }
 
                     val currentIds = mutableSetOf<String>()
@@ -100,7 +100,7 @@ class OrderAlertService : Service() {
                         .filter { it.isNotBlank() }
                         .toSet()
 
-                    // Chỉ báo những pickup_id thực sự mới.
+                    // Chỉ báo những order_id thực sự mới.
                     val newIds = if (hasBaseline) {
                         currentIds.filter { it !in previousIds }
                     } else {

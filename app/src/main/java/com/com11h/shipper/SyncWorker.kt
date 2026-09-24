@@ -19,7 +19,7 @@ class SyncWorker(appContext: Context, params: WorkerParameters) :
         val kcn = session.kcnId() ?: return Result.success()
 
         return try {
-            Api(BuildConfig.API_BASE_URL, kcn, token).call("shipper_orders")
+            Api(BuildConfig.API_BASE_URL, kcn, token).call("shipper_available_orders")
             Result.success()
         } catch (_: UnauthorizedException) {
             Result.success()
