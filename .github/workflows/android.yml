@@ -1,0 +1,73 @@
+name: Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      API_BASE_URL: ${{ secrets.API_BASE_URL }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      # GitHub-hosted Ubuntu runners already provide the Android SDK.
+      # Do not run setup-android/sdkmanager here: the old workflow failed
+      # while sdkmanager was computing repository updates before Gradle ran.
+      - name: Verify Android SDK
+        shell: bash
+        run: |
+          set -e
+          test -d "$ANDROID_HOME"
+          test -d "$ANDROID_HOME/platforms/android-35" || {
+            echo "Android SDK platform 35 is not installed on this runner."
+            exit 1
+          }
+          test -d "$ANDROID_HOME/build-tools/35.0.0" || {
+            echo "Android build-tools 35.0.0 are not installed on this runner."
+            exit 1
+          }
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          "$ANDROID_HOME/platform-tools/adb" version || true
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Restore release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          set -e
+          test -n "$KEYSTORE_BASE64" || { echo "Missing KEYSTORE_BASE64"; exit 1; }
+          test -n "$KEYSTORE_PASSWORD" || { echo "Missing KEYSTORE_PASSWORD"; exit 1; }
+          test -n "$KEY_ALIAS" || { echo "Missing KEY_ALIAS"; exit 1; }
+          test -n "$KEY_PASSWORD" || { echo "Missing KEY_PASSWORD"; exit 1; }
+          echo "$KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+          test -s app/release.keystore
+
+      - name: Build release APK
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: com11h-shipper-release
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
